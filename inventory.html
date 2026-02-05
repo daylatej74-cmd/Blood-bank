@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="LifeBank Blood Inventory - Real-time tracking of blood supply levels and donation needs.">
+    <meta name="keywords" content="blood inventory, blood supply, blood types, blood shortage">
+    <meta name="author" content="LifeBank">
+    <title>Blood Inventory - LifeBank</title>
+    <!-- Schema.org Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "LifeBank Blood Inventory",
+        "description": "Real-time blood inventory tracking system",
+        "url": "https://lifebank.org/inventory"
+    }
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preload" as="font" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" type="font/woff2">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .inventory-card { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.95); }
+        .blood-level-critical { background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); }
+        .blood-level-low { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); }
+        .blood-level-normal { background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); }
+        .blood-level-high { background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); }
+        .pulse-animation { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        /* Mobile Navigation Styles */
+        .mobile-menu { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-in-out; }
+        .mobile-menu.active { max-height: 500px; }
+        .hamburger { display: none; flex-direction: column; cursor: pointer; }
+        .hamburger span { width: 25px; height: 3px; background: #1e3a8a; margin: 4px 0; transition: all 0.3s ease; }
+        .hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(8px, 8px); }
+        .hamburger.active span:nth-child(2) { opacity: 0; }
+        .hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(7px, -7px); }
+        @media (max-width: 768px) { .hamburger { display: flex; } }
+        /* Accessibility */
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border-width: 0; }
+        .focus\:not-sr-only:focus { position: static; width: auto; height: auto; padding: inherit; margin: inherit; overflow: visible; clip: auto; white-space: normal; }
+        /* Toast Notifications */
+        .toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 50; }
+        .toast { margin-bottom: 0.5rem; padding: 1rem; border-radius: 0.5rem; color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: slideInRight 0.3s ease-out; }
+        .toast-success { background-color: #10b981; }
+        .toast-error { background-color: #ef4444; }
+        .toast-info { background-color: #3b82f6; }
+        @keyframes slideInRight { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50">
+    <!-- Skip to Content Link for Accessibility -->
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 focus:z-50 focus:bg-red-600 focus:text-white focus:px-4 focus:py-2">Skip to main content</a>
+    
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg fixed w-full top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <h1 class="text-2xl font-bold text-blue-900">LifeBank</h1>
+                    </div>
+                </div>
+                <!-- Desktop Navigation -->
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="index.html" class="text-gray-700 hover:text-red-600 px-3 py-2 rounded-md text-sm font-medium transition-colors" aria-label="Home page">Home</a>
+                        <a href="register.html" class="text-gray-700 hover:text-red-600 px-3 py-2 rounded-md text-sm font-medium transition-colors" aria-label="Register to donate">Register</a>
+                        <a href="inventory.html" class="text-blue-900 hover:text-red-600 px-3 py-2 rounded-md text-sm font-medium transition-colors" aria-label="Blood inventory">Inventory</a>
+                        <a href="about.html" class="text-gray-700 hover:text-red-600 px-3 py-2 rounded-md text-sm font-medium transition-colors" aria-label="About LifeBank">About</a>
+                    </div>
+                </div>
+                <!-- Mobile Hamburger Button -->
+                <button id="mobile-menu-btn" class="hamburger md:hidden" aria-label="Toggle mobile menu" aria-expanded="false" aria-controls="mobile-menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <div class="flex items-center gap-4">
+                    <span class="bg-red-600 text-white px-3 py-1 rounded-full text-sm font-medium pulse-animation">Critical: O- Blood Needed</span>
+                </div>
+            </div>
+            <!-- Mobile Navigation Menu -->
+            <div id="mobile-menu" class="mobile-menu md:hidden bg-white border-t">
+                <a href="index.html" class="block text-gray-700 hover:bg-blue-50 px-4 py-2 rounded-md text-sm font-medium transition-colors">Home</a>
+                <a href="register.html" class="block text-gray-700 hover:bg-blue-50 px-4 py-2 rounded-md text-sm font-medium transition-colors">Register</a>
+                <a href="inventory.html" class="block text-blue-900 hover:bg-blue-50 px-4 py-2 rounded-md text-sm font-medium transition-colors">Inventory</a>
+                <a href="about.html" class="block text-gray-700 hover:bg-blue-50 px-4 py-2 rounded-md text-sm font-medium transition-colors">About</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <section class="pt-24 pb-12 bg-gradient-to-r from-blue-900 to-blue-700" id="main-content">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h1 class="text-4xl font-bold text-white mb-4">Blood Inventory Management</h1>
+            <p class="text-xl text-blue-100">Real-time tracking of blood supply levels and donation needs</p>
+        </div>
+    </section>
+
+    <!-- Emergency Alerts -->
+    <section class="bg-red-50 py-4 border-b border-red-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="w-3 h-3 bg-red-600 rounded-full pulse-animation"></div>
+                    <span class="text-red-800 font-semibold">CRITICAL SHORTAGE:</span>
+                    <span class="text-red-700">O- Blood Type - Only 2 days supply remaining</span>
+                </div>
+                <div class="flex space-x-2">
+                    <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">AB-: Low</span>
+                    <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">B-: Low</span>
+                    <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">A+: Normal</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Blood Inventory Overview -->
+    <section class="py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Current Blood Supply Levels</h2>
+                <p class="text-gray-600">Updated every 15 minutes from our network of donation centers</p>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-12">
+                <!-- O- Blood Type -->
+                <div class="inventory-card blood-level-critical rounded-lg p-6 text-center shadow-lg">
+                    <div class="text-3xl font-bold text-red-600 mb-2">O-</div>
+                    <div class="text-sm text-gray-600 mb-2">Universal Donor</div>
+                    <div class="text-2xl font-bold text-red-600 mb-1">2</div>
+                    <div class="text-xs text-gray-500">Days Supply</div>
+                    <div class="mt-3">
+                        <div class="w-full bg-red-200 rounded-full h-2">
+                            <div class="bg-red-600 h-2 rounded-full" style="width: 20%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- O+ Blood Type -->
+                <div class="inventory-card blood-level-normal rounded-lg p-6 text-center shadow-lg">
+                    <div class="text-3xl font-bold text-green-600 mb-2">O+</div>
+                    <div class="text-sm text-gray-600 mb-2">Most Common</div>
+                    <div class="text-2xl font-bold text-green-600 mb-1">8</div>
+                    <div class="text-xs text-gray-500">Days Supply</div>
+                    <div class="mt-3">
+                        <div class="w-full bg-green-200 rounded-full h-2">
+                            <div class="bg-green-600 h-2 rounded-full" style="width: 80%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- A- Blood Type -->
+                <div class="inventory-card blood-level-normal rounded-lg p-6 text-center shadow-lg">
+                    <div class="text-3xl font-bold text-green-600 mb-2">A-</div>
+                    <div class="text-sm text-gray-600 mb-2">A/Rh- Only</div>
+                    <div class="text-2xl font-bold text-green-600 mb-1">6</div>
+                    <div class="text-xs text-gray-500">Days Supply</div>
+                    <div class="mt-3">
+                        <div class="w-full bg-green-200 rounded-full h-2">
+                            <div class="bg-green-600 h-2 rounded-full" style="width: 60%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- A+ Blood Type -->
+                <div class="inventory-card blood-level-high rounded-lg p-6 text-center shadow-lg">
+                    <div class="text-3xl font-bold text-blue-600 mb-2">A+</div>
+                    <div class="text-sm text-gray-600 mb-2">A Types</div>
+                    <div class="text-2xl font-bold text-blue-600 mb-1">12</div>
+                    <div class="text-xs text-gray-500">Days Supply</div>
+                    <div class="mt-3">
+                        <div class="w-full bg-blue-200 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- B- Blood Type -->
+                <div class="inventory-card blood-level-low rounded-lg p-6 text-center shadow-lg">
+                    <div class="text-3xl font-bold text-yellow-600 mb-2">B-</div>
+                    <div class="text-sm text-gray-600 mb-2">B/Rh- Only</div>
+                    <div class="text-2xl font-bold text-yellow-600 mb-1">4</div>
+                    <div class="text-xs text-gray-500">Days Supply</div>
+                    <div class="mt-3">
+                        <div class="w-full bg-yellow-200 rounded-full h-2">
+                            <div class="bg-yellow-600 h-2 rounded-full" style="width: 40%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- B+ Blood Type -->
+                <div class="inventory-card blood-level-normal rounded-lg p-6 text-center shadow-lg">
+                    <div class="text-3xl font-bold text-green-600 mb-2">B+</div>
+                    <div class="text-sm text-gray-600 mb-2">B Types</div>
+                    <div class="text-2xl font-bold text-green-600 mb-1">7</div>
+                    <div class="text-xs text-gray-500">Days Supply</div>
+                    <div class="mt-3">
+                        <div class="w-full bg-green-200 rounded-full h-2">
+                            <div class="bg-green-600 h-2 rounded-full" style="width: 70%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AB- Blood Type -->
+                <div class="inventory-card blood-level-low rounded-lg p-6 text-center shadow-lg">
+                    <div class="text-3xl font-bold text-yellow-600 mb-2">AB-</div>
+                    <div class="text-sm text-gray-600 mb-2">AB/Rh- Only</div>
+                    <div class="text-2xl font-bold text-yellow-600 mb-1">3</div>
+                    <div class="text-xs text-gray-500">Days Supply</div>
+                    <div class="mt-3">
+                        <div class="w-full bg-yellow-200 rounded-full h-2">
+                            <div class="bg-yellow-600 h-2 rounded-full" style="width: 30%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AB+ Blood Type -->
+                <div class="inventory-card blood-level-normal rounded-lg p-6 text-center shadow-lg">
+                    <div class="text-3xl font-bold text-green-600 mb-2">AB+</div>
+                    <div class="text-sm text-gray-600 mb-2">Universal Recipient</div>
+                    <div class="text-2xl font-bold text-green-600 mb-1">9</div>
+                    <div class="text-xs text-gray-500">Days Supply</div>
+                    <div class="mt-3">
+                        <div class="w-full bg-green-200 rounded-full h-2">
+                            <div class="bg-green-600 h-2 rounded-full" style="width: 90%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventory Chart -->
+            <div class="bg-white rounded-lg shadow-lg p-8 mb-12">
+                <h3 class="text-2xl font-bold text-gray-900 mb-6">Blood Supply Trends (Last 30 Days)</h3>
+                <div id="trends-chart" style="width: 100%; height: 400px;"></div>
+            </div>
+
+            <!-- Donation Centers -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="bg-white rounded-lg shadow-lg p-8">
+                    <h3 class="text-2xl font-bold text-gray-900 mb-6">Donation Centers</h3>
+                    <div class="space-y-4">
+                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-semibold text-gray-900">Downtown Medical Center</h4>
+                                <span class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">Open</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-2">123 Main Street, Downtown</p>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-500">Mon-Fri: 8AM-6PM</span>
+                                <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                                    Book Appointment
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-semibold text-gray-900">Suburban Blood Bank</h4>
+                                <span class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">Open</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-2">456 Oak Avenue, Suburbs</p>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-500">Mon-Sat: 9AM-7PM</span>
+                                <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                                    Book Appointment
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-semibold text-gray-900">Mobile Donation Unit</h4>
+                                <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium">Limited</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-2">Various locations - Check schedule</p>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-500">Schedule varies</span>
+                                <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                                    View Schedule
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-lg p-8">
+                    <h3 class="text-2xl font-bold text-gray-900 mb-6">Your Donation Dashboard</h3>
+                    <div class="space-y-6">
+                        <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg">
+                            <h4 class="font-semibold text-blue-900 mb-2">Next Eligible Donation</h4>
+                            <p class="text-blue-800 text-sm mb-3">You can donate again in:</p>
+                            <div class="text-2xl font-bold text-blue-900">12 days</div>
+                            <p class="text-xs text-blue-600 mt-1">Last donation: January 15, 2025</p>
+                        </div>
+
+                        <div class="bg-gradient-to-r from-green-50 to-green-100 p-6 rounded-lg">
+                            <h4 class="font-semibold text-green-900 mb-2">Lifetime Impact</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <div class="text-xl font-bold text-green-900">8</div>
+                                    <div class="text-xs text-green-600">Total Donations</div>
+                                </div>
+                                <div>
+                                    <div class="text-xl font-bold text-green-900">24</div>
+                                    <div class="text-xs text-green-600">Lives Saved</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-r from-purple-50 to-purple-100 p-6 rounded-lg">
+                            <h4 class="font-semibold text-purple-900 mb-2">Upcoming Appointments</h4>
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-purple-800 text-sm">Jan 28, 2025 - 10:00 AM</span>
+                                    <span class="bg-purple-200 text-purple-800 px-2 py-1 rounded-full text-xs">Confirmed</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-purple-800 text-sm">Mar 15, 2025 - 2:00 PM</span>
+                                    <span class="bg-gray-200 text-gray-600 px-2 py-1 rounded-full text-xs">Scheduled</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-medium transition-colors">
+                            Schedule New Appointment
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Blood Type Compatibility Matrix -->
+    <section class="py-12 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-900 mb-4">Blood Type Compatibility Matrix</h2>
+                <p class="text-xl text-gray-600">Understanding which blood types can receive from which donors</p>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-200">
+                                <th class="text-left py-3 px-4 font-semibold text-gray-900">Blood Type</th>
+                                <th class="text-center py-3 px-4 font-semibold text-gray-900">Can Donate To</th>
+                                <th class="text-center py-3 px-4 font-semibold text-gray-900">Can Receive From</th>
+                                <th class="text-center py-3 px-4 font-semibold text-gray-900">Population %</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr class="hover:bg-gray-50">
+                                <td class="py-4 px-4">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                                            <span class="text-red-600 font-bold text-xs">O-</span>
+                                        </div>
+                                        <span class="font-medium">O Negative</span>
+                                    </div>
+                                </td>
+                                <td class="py-4 px-4 text-center text-xs">All Blood Types</td>
+                                <td class="py-4 px-4 text-center text-xs">O- only</td>
+                                <td class="py-4 px-4 text-center">7%</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="py-4 px-4">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                                            <span class="text-red-600 font-bold text-xs">O+</span>
+                                        </div>
+                                        <span class="font-medium">O Positive</span>
+                                    </div>
+                                </td>
+                                <td class="py-4 px-4 text-center text-xs">O+, A+, B+, AB+</td>
+                                <td class="py-4 px-4 text-center text-xs">O+, O-</td>
+                                <td class="py-4 px-4 text-center">38%</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="py-4 px-4">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                                            <span class="text-blue-600 font-bold text-xs">A-</span>
+                                        </div>
+                                        <span class="font-medium">A Negative</span>
+                                    </div>
+                                </td>
+                                <td class="py-4 px-4 text-center text-xs">A-, A+, AB-, AB+</td>
+                                <td class="py-4 px-4 text-center text-xs">A-, O-</td>
+                                <td class="py-4 px-4 text-center">6%</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="py-4 px-4">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                                            <span class="text-blue-600 font-bold text-xs">A+</span>
+                                        </div>
+                                        <span class="font-medium">A Positive</span>
+                                    </div>
+                                </td>
+                                <td class="py-4 px-4 text-center text-xs">A+, AB+</td>
+                                <td class="py-4 px-4 text-center text-xs">A+, A-, O+, O-</td>
+                                <td class="py-4 px-4 text-center">34%</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="py-4 px-4">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                                            <span class="text-green-600 font-bold text-xs">B-</span>
+                                        </div>
+                                        <span class="font-medium">B Negative</span>
+                                    </div>
+                                </td>
+                                <td class="py-4 px-4 text-center text-xs">B-, B+, AB-, AB+</td>
+                                <td class="py-4 px-4 text-center text-xs">B-, O-</td>
+                                <td class="py-4 px-4 text-center">2%</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="py-4 px-4">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                                            <span class="text-green-600 font-bold text-xs">B+</span>
+                                        </div>
+                                        <span class="font-medium">B Positive</span>
+                                    </div>
+                                </td>
+                                <td class="py-4 px-4 text-center text-xs">B+, AB+</td>
+                                <td class="py-4 px-4 text-center text-xs">B+, B-, O+, O-</td>
+                                <td class="py-4 px-4 text-center">9%</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="py-4 px-4">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mr-3">
+                                            <span class="text-purple-600 font-bold text-xs">AB-</span>
+                                        </div>
+                                        <span class="font-medium">AB Negative</span>
+                                    </div>
+                                </td>
+                                <td class="py-4 px-4 text-center text-xs">AB-, AB+</td>
+                                <td class="py-4 px-4 text-center text-xs">AB-, A-, B-, O-</td>
+                                <td class="py-4 px-4 text-center">1%</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="py-4 px-4">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mr-3">
+                                            <span class="text-purple-600 font-bold text-xs">AB+</span>
+                                        </div>
+                                        <span class="font-medium">AB Positive</span>
+                                    </div>
+                                </td>
+                                <td class="py-4 px-4 text-center text-xs">AB+ only</td>
+                                <td class="py-4 px-4 text-center text-xs">All Blood Types</td>
+                                <td class="py-4 px-4 text-center">3%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <h3 class="text-2xl font-bold mb-4">LifeBank</h3>
+                    <p class="text-gray-400">Saving lives through safe and accessible blood donation services.</p>
+                </div>
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Quick Links</h4>
+                    <ul class="space-y-2">
+                        <li><a href="register.html" class="text-gray-400 hover:text-white transition-colors">Register to Donate</a></li>
+                        <li><a href="inventory.html" class="text-gray-400 hover:text-white transition-colors">Blood Inventory</a></li>
+                        <li><a href="about.html" class="text-gray-400 hover:text-white transition-colors">About Us</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Emergency Contact</h4>
+                    <p class="text-gray-400">1-800-DONATE</p>
+                    <p class="text-gray-400">24/7 Emergency Blood Hotline</p>
+                </div>
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Follow Us</h4>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors">Facebook</a>
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors">Twitter</a>
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors">Instagram</a>
+                    </div>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center">
+                <p class="text-gray-400">&copy; 2025 LifeBank. All rights reserved. | Saving lives through blood donation.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="security.js"></script>
+    <script src="main.js"></script>
+    <script>
+        // Mobile Menu Toggle
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const mobileMenu = document.getElementById('mobile-menu');
+        
+        if (mobileMenuBtn && mobileMenu) {
+            mobileMenuBtn.addEventListener('click', function() {
+                mobileMenu.classList.toggle('active');
+                mobileMenuBtn.classList.toggle('active');
+                mobileMenuBtn.setAttribute('aria-expanded', mobileMenuBtn.classList.contains('active'));
+            });
+
+            // Close menu when a link is clicked
+            const mobileLinks = mobileMenu.querySelectorAll('a');
+            mobileLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    mobileMenu.classList.remove('active');
+                    mobileMenuBtn.classList.remove('active');
+                    mobileMenuBtn.setAttribute('aria-expanded', 'false');
+                });
+            });
+        }
+    </script>
+</body>
+</html>
